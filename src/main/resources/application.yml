@@ -1,0 +1,14 @@
+management:
+  endpoints:
+    web:
+      exposure:
+        include: info, health, prometheus, metrics
+      base-path: /
+      path-mapping:
+        health: /health
+        info: /info
+        prometheus: /metrics
+        metrics: /actuator/metrics
+
+server:
+  port: 8081

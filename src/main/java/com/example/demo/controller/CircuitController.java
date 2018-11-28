@@ -19,7 +19,10 @@ import org.springframework.web.client.RestTemplate;
 @Validated
 public class CircuitController {
 
-    private static final int STOP_AT = 5;
+    private static final int FIRST_STOP_AT  = 5;
+    private static final int SECOND_STOP_AT = 8;
+    private static final int FINAL_STOP_AT = 13;
+
     private static int count = 0;
 
     @Autowired
@@ -28,7 +31,8 @@ public class CircuitController {
     @HystrixCommand(fallbackMethod = "fallback",
             commandKey = "circuit1",
             commandProperties = {
-                    @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000")
+                    // @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "5000")
+                    // // or using configuration from application.yml
     })
     @GetMapping("/circuit1")
     public ResponseEntity<String> circuit1() {
@@ -40,8 +44,6 @@ public class CircuitController {
     }
 
     // ---------------------------
-
-
     @HystrixCommand(fallbackMethod = "fallback",
             commandKey = "circuit2",
             commandProperties = {
@@ -59,11 +61,11 @@ public class CircuitController {
     }
 
     // --------
-
     @HystrixCommand(fallbackMethod = "fallback",
             commandKey = "circuit3",
             commandProperties = {
                     @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000")
+                    // override timeoutInMilliseconds to 3000
             })
     @GetMapping("/circuit3")
     public ResponseEntity<String> circuit3() {
@@ -90,20 +92,20 @@ public class CircuitController {
             commandKey = "circuit4",
             commandProperties = {
                     @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000"),
-                    @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "2")
+                    // @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "2")
             }, ignoreExceptions = ArithmeticException.class)
     @GetMapping("/circuit4")
     public ResponseEntity<String> circuit4() {
         count++;
         try {
-            if(count < STOP_AT || (count > 8 && count < 13) ) {
+            if(count < FIRST_STOP_AT || (count > SECOND_STOP_AT && count < FINAL_STOP_AT) ) {
                 restTemplate.getForObject("http://googlexxxx.com:81", String.class);
                 return ResponseEntity.ok("Hello, " + getHystrixStatus("circuit4"));
             }
             else {
                 restTemplate.getForObject("http://google.com", String.class);
                 HystrixCircuitBreaker.Factory.getInstance(HystrixCommandKey.Factory.asKey("circuit4")).markSuccess();
-                throw new ArithmeticException("this is expected exception");
+                throw new ArithmeticException("This is expected exception");
             }
 
         } catch (HttpClientErrorException | HttpServerErrorException e) {
@@ -117,9 +119,6 @@ public class CircuitController {
     }
 
     // ---------------------------
-
-
-
     @HystrixCommand(fallbackMethod = "fallback",
             commandKey = "circuit5",
             commandProperties = {
@@ -130,11 +129,10 @@ public class CircuitController {
     public ResponseEntity<String> circuit5() {
         count++;
         try {
-            if(count < STOP_AT) {
+            if(count < FIRST_STOP_AT) {
                 restTemplate.getForObject("http://googlexxxx.com:81", String.class);
                 return ResponseEntity.ok("Hello, " + getHystrixStatus("circuit5"));
-            }
-            else {
+            } else {
                 restTemplate.getForObject("http://google.com", String.class);
             }
 
@@ -154,7 +152,6 @@ public class CircuitController {
     }
 
     // ---------------------------
-
     private ResponseEntity<String> fallback() {
         throw new ArithmeticException("exception inside fallback " + getHystrixStatus("circuit4") + " " + count);
     }

@@ -12,3 +12,14 @@ management:
 
 server:
   port: 8081
+
+hystrix:
+  command:
+    default:
+      circuitBreaker:
+        requestVolumeThreshold: 5
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 5000
+

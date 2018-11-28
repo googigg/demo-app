@@ -1,12 +1,14 @@
 package com.example.demo.controller;
 
+import com.netflix.hystrix.HystrixCircuitBreaker;
+import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
@@ -17,10 +19,14 @@ import org.springframework.web.client.RestTemplate;
 @Validated
 public class CircuitController {
 
+    private static final int STOP_AT = 5;
+    private static int count = 0;
+
     @Autowired
     RestTemplate restTemplate;
 
     @HystrixCommand(fallbackMethod = "fallback",
+            commandKey = "circuit1",
             commandProperties = {
                     @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000")
     })
@@ -30,13 +36,14 @@ public class CircuitController {
         restTemplate.getForObject("http://google.com:81", String.class);
         return ResponseEntity.ok("Hello");
 
-        // it jumps to fallback method due to TIMEOUT exception
+        // it jumps to fallback method due to hystrix TIMEOUT exception
     }
 
     // ---------------------------
 
 
     @HystrixCommand(fallbackMethod = "fallback",
+            commandKey = "circuit2",
             commandProperties = {
                     @HystrixProperty(name = "execution.timeout.enabled", value = "false"),
                     @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000")
@@ -54,6 +61,7 @@ public class CircuitController {
     // --------
 
     @HystrixCommand(fallbackMethod = "fallback",
+            commandKey = "circuit3",
             commandProperties = {
                     @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000")
             })
@@ -79,17 +87,62 @@ public class CircuitController {
 
 
     @HystrixCommand(fallbackMethod = "fallback",
+            commandKey = "circuit4",
             commandProperties = {
-                    @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000")
-            })
+                    @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000"),
+                    @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "2")
+            }, ignoreExceptions = ArithmeticException.class)
     @GetMapping("/circuit4")
     public ResponseEntity<String> circuit4() {
+        count++;
         try {
-            restTemplate.getForObject("http://googlexxxx.com:81", String.class);
+            if(count < STOP_AT || (count > 8 && count < 13) ) {
+                restTemplate.getForObject("http://googlexxxx.com:81", String.class);
+                return ResponseEntity.ok("Hello, " + getHystrixStatus("circuit4"));
+            }
+            else {
+                restTemplate.getForObject("http://google.com", String.class);
+                HystrixCircuitBreaker.Factory.getInstance(HystrixCommandKey.Factory.asKey("circuit4")).markSuccess();
+                throw new ArithmeticException("this is expected exception");
+            }
+
         } catch (HttpClientErrorException | HttpServerErrorException e) {
+            throw e;
         } catch (ResourceAccessException e) {
             e.printStackTrace();
             throw e; // throw e for hytrix do fallback
+        }
+
+        // need to force closed circuit breaker manually
+    }
+
+    // ---------------------------
+
+
+
+    @HystrixCommand(fallbackMethod = "fallback",
+            commandKey = "circuit5",
+            commandProperties = {
+                    @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000"),
+                    @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "2")
+            })
+    @GetMapping("/circuit5")
+    public ResponseEntity<String> circuit5() {
+        count++;
+        try {
+            if(count < STOP_AT) {
+                restTemplate.getForObject("http://googlexxxx.com:81", String.class);
+                return ResponseEntity.ok("Hello, " + getHystrixStatus("circuit5"));
+            }
+            else {
+                restTemplate.getForObject("http://google.com", String.class);
+            }
+
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
+            throw e;
+        } catch (ResourceAccessException e) {
+            e.printStackTrace();
+            throw e; // throw e for hystrix do fallback
         } catch (IllegalArgumentException e) {
             e.printStackTrace();
         } catch(Exception e) {
@@ -97,12 +150,26 @@ public class CircuitController {
         }
 
         // fallback activated
-        return ResponseEntity.ok("Hello");
+        return ResponseEntity.ok("Hello, " + getHystrixStatus("circuit5"));
     }
 
     // ---------------------------
 
     private ResponseEntity<String> fallback() {
-        return ResponseEntity.ok("Fallback activated");
+        throw new ArithmeticException("exception inside fallback " + getHystrixStatus("circuit4") + " " + count);
+    }
+
+    private String getHystrixStatus(String commandKey) {
+        return (HystrixCircuitBreaker.Factory.getInstance(HystrixCommandKey.Factory.asKey(commandKey)).isOpen()) ? "circuit opened" : "circuit closed";
+    }
+
+    @GetMapping("/circuit6")
+    public ResponseEntity<String> circuit5(@RequestParam(value = "commandKey", defaultValue = "") String commandKey) {
+        try {
+            return ResponseEntity.ok("" + getHystrixStatus(commandKey));
+        } catch (NullPointerException e) {
+
+            return ResponseEntity.ok(commandKey + " not found");
+        }
     }
 }

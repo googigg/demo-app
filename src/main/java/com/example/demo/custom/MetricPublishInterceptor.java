@@ -33,7 +33,7 @@ public class MetricPublishInterceptor implements HandlerInterceptor {
             long processingTime = System.currentTimeMillis() - (Long) httpServletRequest.getAttribute(REQ_PARAM_TIMING);
 
 
-            System.out.println("hello");
+            // System.out.println("hello");
             // TODO, revise proper way for metric
             Metrics.gauge("demo", processingTime);
             Metrics.counter("demo", "info", "TEST").increment();

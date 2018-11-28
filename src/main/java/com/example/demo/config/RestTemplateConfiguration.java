@@ -30,22 +30,23 @@ public class RestTemplateConfiguration {
     @Primary
     public RestTemplate restTemplate() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException  {
 
-        // HttpComponentsClientHttpRequestFactory httpComponentFactory = new HttpComponentsClientHttpRequestFactory();
-        // httpComponentFactory.setReadTimeout(generalRestTemplateProperties.getReadTimeout());
-        // httpComponentFactory.setConnectTimeout(generalRestTemplateProperties.getConnectionTimeout());
-        // httpComponentFactory.setHttpClient(this.httpClient());
-        // RestTemplate restTemplate = new RestTemplate(httpComponentFactory);
+         // HttpComponentsClientHttpRequestFactory httpComponentFactory = new HttpComponentsClientHttpRequestFactory();
+         //httpComponentFactory.setReadTimeout(generalRestTemplateProperties.getReadTimeout());
+         //httpComponentFactory.setConnectTimeout(generalRestTemplateProperties.getConnectionTimeout());
+         //httpComponentFactory.setHttpClient(this.httpClient());
+         // RestTemplate restTemplate = new RestTemplate(httpCom ponentFactory);
 
-        // setClientRequestInterceptorToInterceptor(restTemplate);
-//
-//        restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
-//            @Override
-//            public boolean hasError(ClientHttpResponse clientHttpResponse) throws IOException {
-//                return false;
-//            }
-//        });
+         // setClientRequestInterceptorToInterceptor(restTemplate);
 
         RestTemplate restTemplate = new RestTemplate();
+        restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
+            @Override
+            public boolean hasError(ClientHttpResponse clientHttpResponse) throws IOException {
+                return clientHttpResponse.getStatusCode().is4xxClientError() || clientHttpResponse.getStatusCode().is5xxServerError();
+            }
+        });
+
+
 
         return restTemplate;
     }

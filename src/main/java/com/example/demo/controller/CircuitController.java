@@ -93,7 +93,7 @@ public class CircuitController {
             commandProperties = {
                     @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000"),
                     // @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "2")
-            }, ignoreExceptions = ArithmeticException.class)
+            }, ignoreExceptions = RuntimeException.class)
     @GetMapping("/circuit4")
     public ResponseEntity<String> circuit4() {
         count++;
@@ -103,18 +103,20 @@ public class CircuitController {
                 return ResponseEntity.ok("Hello, " + getHystrixStatus("circuit4"));
             }
             else {
-                restTemplate.getForObject("http://google.com", String.class);
+                System.out.println(restTemplate.getForEntity("http://google.com", String.class).getStatusCode());
                 HystrixCircuitBreaker.Factory.getInstance(HystrixCommandKey.Factory.asKey("circuit4")).markSuccess();
-                throw new ArithmeticException("This is expected exception");
+                throw new RuntimeException("This is expected exception");
             }
 
         } catch (HttpClientErrorException | HttpServerErrorException e) {
             throw e;
         } catch (ResourceAccessException e) {
-            e.printStackTrace();
-            throw e; // throw e for hytrix do fallback
+            System.out.println("ResourceAccessException : " + count);
+            // e.printStackTrace();
+            // throw e; // throw e for hytrix do fallback
         }
 
+        return ResponseEntity.ok("Hello");
         // need to force closed circuit breaker manually
     }
 
@@ -153,7 +155,10 @@ public class CircuitController {
 
     // ---------------------------
     private ResponseEntity<String> fallback() {
-        throw new ArithmeticException("exception inside fallback " + getHystrixStatus("circuit4") + " " + count);
+        System.out.println("Count: " + count);
+        // throw new RuntimeException("Exception inside fallback " + count);
+        // it could be wrapped to HystrixRunTimeExpection
+        return ResponseEntity.ok("fallback");
     }
 
     private String getHystrixStatus(String commandKey) {

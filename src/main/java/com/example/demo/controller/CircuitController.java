@@ -5,6 +5,7 @@ import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -135,7 +136,7 @@ public class CircuitController {
             commandProperties = {
                     @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "3000"),
                     @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "2")
-            })
+            }, ignoreExceptions = HttpServerErrorException.class)
     @GetMapping("/circuit5")
     public ResponseEntity<String> circuit5() {
         count++;
@@ -144,7 +145,8 @@ public class CircuitController {
                 restTemplate.getForObject("http://invalidresourceexception.123:81", String.class);
                 return null;
             } else {
-                restTemplate.getForObject("http://google.com", String.class);
+                // restTemplate.getForObject("http://google.com", String.class);
+                throw new HttpServerErrorException(HttpStatus.BAD_REQUEST);
             }
 
         } catch (HttpClientErrorException | HttpServerErrorException e) {
